@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Merry Christmas - Instanced Tree Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      background:
+        radial-gradient(circle at 50% 15%, #0f2418 0%, #060b0a 38%, #020203 100%);
+      color: #fff;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    .title {
+      position: fixed;
+      top: 26px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      text-align: center;
+      letter-spacing: 0.18em;
+      font-family: "Times New Roman", Georgia, "Noto Serif", serif;
+      font-size: clamp(22px, 3.1vw, 44px);
+      font-weight: 650;
+      color: #fff3c7;
+      text-shadow:
+        0 0 10px rgba(255, 216, 120, 0.38),
+        0 0 28px rgba(255, 190, 70, 0.28);
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .subglow {
+      position: fixed;
+      top: 78px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9;
+      width: min(540px, 82vw);
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(255, 215, 120, 0.6), transparent);
+      opacity: 0.8;
+      pointer-events: none;
+    }
+
+    canvas { display: block; }
+
+    .hint {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      z-index: 10;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.06);
+      backdrop-filter: blur(6px);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      line-height: 1.4;
+      color: rgba(255,255,255,0.8);
+      user-select: none;
+    }
+
+    .audio-hint {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 20;
+      background: rgba(10, 14, 12, 0.7);
+      border: 1px solid rgba(255, 215, 120, 0.25);
+      backdrop-filter: blur(8px);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: #fff4c7;
+      display: none;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .audio-hint strong {
+      font-family: "Times New Roman", Georgia, serif;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="title">MERRY CHRISTMAS</div>
+  <div class="subglow"></div>
+
+  <div class="hint">
+    Short click tree: explode → text → tree<br/>
+    Long press / drag: move the tree
+  </div>
+
+  <div class="audio-hint" id="audioHint">
+    <strong>Music</strong> ready.<br/>
+    Click to enable.
+  </div>
+
+  <!-- 可选：你有 mp3 就放同目录 -->
+  <audio id="bgm" src="./christmas.mp3" loop preload="auto"></audio>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+    import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+    // -----------------------------
+    // Scene / Camera / Renderer
+    // -----------------------------
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x020203, 10, 55);
+
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, 8, 26);
+    camera.lookAt(0, 6, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    document.body.appendChild(renderer.domElement);
+
+    // -----------------------------
+    // Postprocessing Bloom (金色辉光关键)
+    // -----------------------------
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloom = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.85,   // strength
+      0.65,   // radius
+      0.15    // threshold
+    );
+    composer.addPass(bloom);
+
+    // -----------------------------
+    // Lights
+    // -----------------------------
+    scene.add(new THREE.AmbientLight(0xffffff, 0.22));
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    keyLight.position.set(8, 14, 10);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xfff1cc, 0.48);
+    fillLight.position.set(-10, 8, 6);
+    scene.add(fillLight);
+
+    const warmPoint = new THREE.PointLight(0xffd27a, 2.4, 45, 1.7);
+    warmPoint.position.set(0, 10, 6);
+    scene.add(warmPoint);
+
+    const underGlow = new THREE.PointLight(0xffc861, 1.0, 30, 2.2);
+    underGlow.position.set(0, 1.5, 0);
+    scene.add(underGlow);
+
+    const coolPoint = new THREE.PointLight(0xaad7ff, 0.5, 50, 2.0);
+    coolPoint.position.set(-8, 6, -10);
+    scene.add(coolPoint);
+
+    // -----------------------------
+    // Tree setup
+    // -----------------------------
+    const TREE_HEIGHT = 12;
+    const BASE_RADIUS = 5.2;
+
+    const SPHERE_COUNT = 900;
+    const CUBE_COUNT = 450;
+    const TOTAL = SPHERE_COUNT + CUBE_COUNT;
+
+    const sphereGeo = new THREE.SphereGeometry(0.165, 18, 18);
+    const cubeGeo   = new THREE.BoxGeometry(0.265, 0.265, 0.265);
+
+    const goldSphereMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color("#f7d479"),
+      metalness: 1.0,
+      roughness: 0.16,
+      clearcoat: 0.25,
+      emissive: new THREE.Color("#7a540f"),
+      emissiveIntensity: 0.28
+    });
+
+    const redSphereMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color("#c81f24"),
+      metalness: 0.95,
+      roughness: 0.22,
+      clearcoat: 0.25,
+      emissive: new THREE.Color("#3a0506"),
+      emissiveIntensity: 0.20
+    });
+
+    const goldCubeMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color("#e9c86a"),
+      metalness: 0.95,
+      roughness: 0.24,
+      emissive: new THREE.Color("#6a470c"),
+      emissiveIntensity: 0.14
+    });
+
+    const greenCubeMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color("#0b3a24"),
+      metalness: 0.78,
+      roughness: 0.34,
+      emissive: new THREE.Color("#071f14"),
+      emissiveIntensity: 0.09
+    });
+
+    const goldSpheres = new THREE.InstancedMesh(sphereGeo, goldSphereMat, Math.floor(SPHERE_COUNT * 0.65));
+    const redSpheres  = new THREE.InstancedMesh(sphereGeo, redSphereMat,  SPHERE_COUNT - goldSpheres.count);
+    const goldCubes   = new THREE.InstancedMesh(cubeGeo, goldCubeMat, Math.floor(CUBE_COUNT * 0.55));
+    const greenCubes  = new THREE.InstancedMesh(cubeGeo, greenCubeMat, CUBE_COUNT - goldCubes.count);
+
+    [goldSpheres, redSpheres, goldCubes, greenCubes].forEach(m => {
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    });
+
+    const treeRoot = new THREE.Group();
+    scene.add(treeRoot);
+    treeRoot.add(goldSpheres, redSpheres, goldCubes, greenCubes);
+
+    // Tree topper (yellow octahedron)
+    const topperGeo = new THREE.OctahedronGeometry(0.48);
+    const topperMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color("#ffe36a"),
+      metalness: 0.82,
+      roughness: 0.18,
+      clearcoat: 0.32,
+      emissive: new THREE.Color("#8a6314"),
+      emissiveIntensity: 0.30
+    });
+    const topper = new THREE.Mesh(topperGeo, topperMat);
+    topper.position.set(0, TREE_HEIGHT + 0.4, 0);
+    treeRoot.add(topper);
+
+    // -----------------------------
+    // Targets per mesh
+    // -----------------------------
+    function makeTargets(count) {
+      return {
+        tree: new Array(count),
+        explode: new Array(count),
+        text: new Array(count),
+        current: new Array(count),
+        start: new Array(count),
+        delay: new Float32Array(count) // 错峰关键
+      };
+    }
+
+    const targets = {
+      goldSpheres: makeTargets(goldSpheres.count),
+      redSpheres:  makeTargets(redSpheres.count),
+      goldCubes:   makeTargets(goldCubes.count),
+      greenCubes:  makeTargets(greenCubes.count),
+    };
+
+    const tempObj = new THREE.Object3D();
+
+    function randomTreePosition() {
+      const y = Math.random() * TREE_HEIGHT;
+      const t = 1 - (y / TREE_HEIGHT);
+      const radius = BASE_RADIUS * Math.pow(t, 0.78);
+
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * radius;
+
+      const x = Math.cos(angle) * r;
+      const z = Math.sin(angle) * r;
+
+      return new THREE.Vector3(x, y, z);
+    }
+
+    function randomTreeScale(isCube=false) {
+      const base = isCube ? 0.92 : 1.0;
+      const jitter = 0.65 + Math.random() * 0.95;
+      return base * jitter;
+    }
+
+    function makeExplodePosition(origin) {
+      const dir = new THREE.Vector3(
+        (Math.random() - 0.5),
+        (Math.random() - 0.15),
+        (Math.random() - 0.5)
+      ).normalize();
+      const distance = 5.5 + Math.random() * 10.5;
+      return origin.clone().add(dir.multiplyScalar(distance));
+    }
+
+    // Delay based on height + randomness -> 像视频那种“层级散开/回收”
+    function computeDelayFromPos(pos) {
+      const h = THREE.MathUtils.clamp(pos.y / TREE_HEIGHT, 0, 1);
+      return h * 0.22 + Math.random() * 0.18;
+    }
+
+    function initPack(mesh, pack, isCube=false) {
+      for (let i = 0; i < mesh.count; i++) {
+        const pos = randomTreePosition();
+        const scale = randomTreeScale(isCube);
+
+        tempObj.position.copy(pos);
+        tempObj.rotation.set(
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+          Math.random() * Math.PI
+        );
+        tempObj.scale.setScalar(scale);
+        tempObj.updateMatrix();
+
+        pack.tree[i] = tempObj.matrix.clone();
+        pack.current[i] = tempObj.matrix.clone();
+        pack.start[i] = tempObj.matrix.clone();
+        pack.delay[i] = computeDelayFromPos(pos);
+
+        const explodePos = makeExplodePosition(pos);
+        tempObj.position.copy(explodePos);
+        tempObj.rotation.set(
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+          Math.random() * Math.PI
+        );
+        tempObj.scale.setScalar(scale);
+        tempObj.updateMatrix();
+        pack.explode[i] = tempObj.matrix.clone();
+      }
+    }
+
+    initPack(goldSpheres, targets.goldSpheres, false);
+    initPack(redSpheres,  targets.redSpheres,  false);
+    initPack(goldCubes,   targets.goldCubes,   true);
+    initPack(greenCubes,  targets.greenCubes,  true);
+
+    // -----------------------------
+    // Text sampling via Canvas
+    // -----------------------------
+    function sampleTextPoints(message, maxPoints) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 920;
+      canvas.height = 260;
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.font = "bold 120px Times New Roman, Georgia, serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "white";
+      ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const points = [];
+      const step = 4;
+
+      for (let y = 0; y < canvas.height; y += step) {
+        for (let x = 0; x < canvas.width; x += step) {
+          const idx = (y * canvas.width + x) * 4;
+          if (img[idx] > 200) points.push({ x, y });
+        }
+      }
+
+      // shuffle
+      for (let i = points.length - 1; i > 0; i--) {
+        const j = (Math.random() * (i + 1)) | 0;
+        [points[i], points[j]] = [points[j], points[i]];
+      }
+
+      const chosen = points.slice(0, maxPoints);
+
+      return chosen.map(p => {
+        const nx = (p.x / canvas.width) * 2 - 1;
+        const ny = (p.y / canvas.height) * 2 - 1;
+
+        const worldX = nx * 7.4;
+        const worldY = 5.2 + (-ny) * 1.25 + (Math.random() - 0.5) * 0.35;
+        const worldZ = (Math.random() - 0.5) * 0.9; // 让字更“立”
+
+        return new THREE.Vector3(worldX, worldY, worldZ);
+      });
+    }
+
+    function buildTextTargets() {
+      const points = sampleTextPoints("MERRY CHRISTMAS", TOTAL);
+      while (points.length < TOTAL) {
+        points.push(new THREE.Vector3(
+          (Math.random() - 0.5) * 10,
+          4 + Math.random() * 4,
+          (Math.random() - 0.5) * 1
+        ));
+      }
+
+      let cursor = 0;
+      function assign(meshKey, isCube=false) {
+        const pack = targets[meshKey];
+        for (let i = 0; i < pack.text.length; i++) {
+          const p = points[cursor++];
+          const scale = randomTreeScale(isCube) * (isCube ? 0.85 : 0.9);
+
+          tempObj.position.copy(p);
+          tempObj.rotation.set(
+            (Math.random() - 0.5) * 0.18,
+            (Math.random() - 0.5) * 0.18,
+            (Math.random() - 0.5) * 0.18
+          );
+          tempObj.scale.setScalar(scale);
+          tempObj.updateMatrix();
+          pack.text[i] = tempObj.matrix.clone();
+        }
+      }
+
+      assign("goldSpheres", false);
+      assign("redSpheres", false);
+      assign("goldCubes", true);
+      assign("greenCubes", true);
+    }
+    buildTextTargets();
+
+    function applyCurrent(mesh, pack) {
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.setMatrixAt(i, pack.current[i]);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+    applyCurrent(goldSpheres, targets.goldSpheres);
+    applyCurrent(redSpheres,  targets.redSpheres);
+    applyCurrent(goldCubes,   targets.goldCubes);
+    applyCurrent(greenCubes,  targets.greenCubes);
+
+    // -----------------------------
+    // Morph system (with per-instance delay)
+    // -----------------------------
+    const SHAPE = { TREE: 0, EXPLODE: 1, TEXT: 2 };
+    let shapeState = SHAPE.TREE;
+
+    let morph = { active: false, t: 0, duration: 1.05 };
+
+    function captureStart(pack) {
+      for (let i = 0; i < pack.current.length; i++) {
+        pack.start[i] = pack.current[i].clone();
+      }
+    }
+
+    function setTargetAndMorph(nextState) {
+      shapeState = nextState;
+      morph.active = true;
+      morph.t = 0;
+
+      captureStart(targets.goldSpheres);
+      captureStart(targets.redSpheres);
+      captureStart(targets.goldCubes);
+      captureStart(targets.greenCubes);
+    }
+
+    function getTargetMatrix(pack, state, i) {
+      if (state === SHAPE.TREE) return pack.tree[i];
+      if (state === SHAPE.EXPLODE) return pack.explode[i];
+      return pack.text[i];
+    }
+
+    const _posA = new THREE.Vector3();
+    const _posB = new THREE.Vector3();
+    const _pos  = new THREE.Vector3();
+    const _quaA = new THREE.Quaternion();
+    const _quaB = new THREE.Quaternion();
+    const _qua  = new THREE.Quaternion();
+    const _scaA = new THREE.Vector3();
+    const _scaB = new THREE.Vector3();
+    const _sca  = new THREE.Vector3();
+
+    function lerpMatrix(out, a, b, t) {
+      a.decompose(_posA, _quaA, _scaA);
+      b.decompose(_posB, _quaB, _scaB);
+
+      _pos.lerpVectors(_posA, _posB, t);
+      _qua.slerpQuaternions(_quaA, _quaB, t);
+      _sca.lerpVectors(_scaA, _scaB, t);
+
+      out.compose(_pos, _qua, _sca);
+      return out;
+    }
+
+    function easeInOutCubic(x) {
+      return x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3)/2;
+    }
+
+    function updateMorphPack(mesh, pack, state, globalT) {
+      const m = new THREE.Matrix4();
+
+      for (let i = 0; i < mesh.count; i++) {
+        const delay = pack.delay[i];
+        const local = THREE.MathUtils.clamp((globalT - delay) / (1 - delay), 0, 1);
+        const t = easeInOutCubic(local);
+
+        const target = getTargetMatrix(pack, state, i);
+        const start  = pack.start[i];
+
+        lerpMatrix(m, start, target, t);
+        pack.current[i] = m.clone();
+        mesh.setMatrixAt(i, m);
+      }
+
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+
+    function rebuildExplodeTargets() {
+      function rebuild(meshKey) {
+        const pack = targets[meshKey];
+        for (let i = 0; i < pack.tree.length; i++) {
+          pack.tree[i].decompose(_posA, _quaA, _scaA);
+
+          const explodePos = makeExplodePosition(_posA);
+          tempObj.position.copy(explodePos);
+          tempObj.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+          );
+          tempObj.scale.copy(_scaA);
+          tempObj.updateMatrix();
+
+          pack.explode[i] = tempObj.matrix.clone();
+        }
+      }
+      rebuild("goldSpheres");
+      rebuild("redSpheres");
+      rebuild("goldCubes");
+      rebuild("greenCubes");
+    }
+
+    // -----------------------------
+    // Raycast hit detection
+    // -----------------------------
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    function setPointerFromEvent(e) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    }
+
+    function hitTree(e) {
+      setPointerFromEvent(e);
+      raycaster.setFromCamera(pointer, camera);
+
+      const hits = [];
+      hits.push(...raycaster.intersectObject(goldSpheres, false));
+      hits.push(...raycaster.intersectObject(redSpheres, false));
+      hits.push(...raycaster.intersectObject(goldCubes, false));
+      hits.push(...raycaster.intersectObject(greenCubes, false));
+
+      return hits.length > 0;
+    }
+
+    // -----------------------------
+    // Long press / drag to move tree
+    // -----------------------------
+    let isPointerDown = false;
+    let isDragging = false;
+    let downTime = 0;
+
+    const LONG_PRESS_MS = 260;
+    const DRAG_THRESHOLD = 6;
+
+    let startClient = { x: 0, y: 0 };
+    const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const dragOffset = new THREE.Vector3();
+    const hitPoint = new THREE.Vector3();
+
+    function getPlaneHit(e, outVec3) {
+      setPointerFromEvent(e);
+      raycaster.setFromCamera(pointer, camera);
+      raycaster.ray.intersectPlane(dragPlane, outVec3);
+      return outVec3;
+    }
+
+    // -----------------------------
+    // Audio: mp3 fallback to synth bells
+    // -----------------------------
+    const bgm = document.getElementById("bgm");
+    const audioHint = document.getElementById("audioHint");
+
+    let audioCtx = null;
+    let bellTimer = null;
+    let audioArmed = false;
+
+    function startSynthBgm() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      const master = audioCtx.createGain();
+      master.gain.value = 0.085;
+      master.connect(audioCtx.destination);
+
+      function bell() {
+        const now = audioCtx.currentTime;
+        const freqs = [880, 1320, 1760];
+
+        freqs.forEach((f, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(f, now);
+
+          gain.gain.setValueAtTime(0.0001, now);
+          gain.gain.linearRampToValueAtTime(0.16 - idx * 0.04, now + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.25);
+
+          osc.connect(gain);
+          gain.connect(master);
+
+          osc.start(now);
+          osc.stop(now + 1.28);
+        });
+      }
+
+      bell();
+      bellTimer = setInterval(() => bell(), 1500 + Math.random() * 1200);
+    }
+
+    function tryPlayMp3() {
+      if (!bgm) return Promise.reject();
+      return bgm.play();
+    }
+
+    function tryPlayMusic() {
+      // 只在第一次用户手势后真正“解锁”
+      if (!audioArmed) return;
+
+      tryPlayMp3().then(() => {
+        // ok
+      }).catch(() => {
+        // mp3 不存在/被拦截 -> synth
+        startSynthBgm();
+      });
+    }
+
+    function armAudioOnce() {
+      if (audioArmed) return;
+      audioArmed = true;
+      audioHint.style.display = "none";
+      tryPlayMusic();
+    }
+
+    // 如果 mp3 资源本身不存在，显示提示（但不打扰）
+    if (bgm) {
+      bgm.addEventListener("error", () => {
+        audioHint.style.display = "block";
+      });
+    }
+
+    audioHint.addEventListener("click", () => {
+      armAudioOnce();
+    });
+
+    // -----------------------------
+    // Pointer events
+    // -----------------------------
+    renderer.domElement.addEventListener("pointerdown", (e) => {
+      isPointerDown = true;
+      isDragging = false;
+      downTime = performance.now();
+      startClient.x = e.clientX;
+      startClient.y = e.clientY;
+
+      if (!hitTree(e)) {
+        isPointerDown = false;
+        return;
+      }
+
+      getPlaneHit(e, hitPoint);
+      dragOffset.copy(hitPoint).sub(treeRoot.position);
+
+      renderer.domElement.setPointerCapture(e.pointerId);
+    });
+
+    renderer.domElement.addEventListener("pointermove", (e) => {
+      if (!isPointerDown) return;
+
+      const dx = e.clientX - startClient.x;
+      const dy = e.clientY - startClient.y;
+      const dist = Math.hypot(dx, dy);
+
+      const held = performance.now() - downTime;
+      if (!isDragging && (held > LONG_PRESS_MS || dist > DRAG_THRESHOLD)) {
+        isDragging = true;
+      }
+
+      if (isDragging) {
+        getPlaneHit(e, hitPoint);
+        treeRoot.position.copy(hitPoint.sub(dragOffset));
+      }
+    });
+
+    renderer.domElement.addEventListener("pointerup", (e) => {
+      if (!isPointerDown) return;
+      isPointerDown = false;
+
+      const held = performance.now() - downTime;
+
+      if (!isDragging && held < LONG_PRESS_MS) {
+        if (hitTree(e)) {
+          // 用户第一次有效点击 -> 解锁音频
+          armAudioOnce();
+
+          if (shapeState === SHAPE.TREE) {
+            setTargetAndMorph(SHAPE.EXPLODE);
+          } else if (shapeState === SHAPE.EXPLODE) {
+            rebuildExplodeTargets();
+            buildTextTargets();
+            setTargetAndMorph(SHAPE.TEXT);
+          } else {
+            setTargetAndMorph(SHAPE.TREE);
+          }
+        }
+      }
+
+      isDragging = false;
+      try { renderer.domElement.releasePointerCapture(e.pointerId); } catch {}
+    });
+
+    // -----------------------------
+    // Animation loop
+    // -----------------------------
+    let last = performance.now();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const now = performance.now();
+      const dt = Math.min(0.032, (now - last) / 1000);
+      last = now;
+
+      // slow rotation
+      treeRoot.rotation.y += dt * 0.18;
+
+      // subtle light breathing
+      warmPoint.intensity = 2.2 + Math.sin(now * 0.0012) * 0.28;
+      underGlow.intensity = 0.9 + Math.sin(now * 0.0016 + 1.2) * 0.16;
+
+      // bloom pulse (very slight)
+      bloom.strength = 0.82 + Math.sin(now * 0.0011) * 0.06;
+
+      // topper
+      topper.position.set(0, TREE_HEIGHT + 0.4, 0);
+      topper.rotation.y += dt * 0.65;
+
+      // morph
+      if (morph.active) {
+        morph.t += dt / morph.duration;
+        const globalT = THREE.MathUtils.clamp(morph.t, 0, 1);
+
+        updateMorphPack(goldSpheres, targets.goldSpheres, shapeState, globalT);
+        updateMorphPack(redSpheres,  targets.redSpheres,  shapeState, globalT);
+        updateMorphPack(goldCubes,   targets.goldCubes,   shapeState, globalT);
+        updateMorphPack(greenCubes,  targets.greenCubes,  shapeState, globalT);
+
+        if (morph.t >= 1) morph.active = false;
+      }
+
+      composer.render();
+    }
+
+    animate();
+
+    // -----------------------------
+    // Resize
+    // -----------------------------
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      composer.setSize(window.innerWidth, window.innerHeight);
+      bloom.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // 如果你希望“打开页面就显示提示可点开音乐”
+    // 但不强制打扰
+    setTimeout(() => {
+      if (!audioArmed) audioHint.style.display = "block";
+    }, 900);
+
+  </script>
+</body>
+</html>
