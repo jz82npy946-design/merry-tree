@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Merry Christmas - Instanced Tree Pro</title>
+  <title>Merry Christmas - Instanced Tree Pro Plus</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <style>
@@ -46,6 +46,23 @@
       height: 2px;
       background: linear-gradient(90deg, transparent, rgba(255, 215, 120, 0.6), transparent);
       opacity: 0.8;
+      pointer-events: none;
+    }
+
+    /* ✅ 署名（右上角小卡片感） */
+    .signature{
+      position: fixed;
+      top: 86px;
+      right: 28px;
+      z-index: 12;
+      font-family: "Times New Roman", Georgia, "Noto Serif", serif;
+      font-size: clamp(12px, 1.1vw, 16px);
+      letter-spacing: 0.08em;
+      color: rgba(255, 238, 200, 0.9);
+      text-shadow:
+        0 0 8px rgba(255, 210, 120, 0.25),
+        0 0 18px rgba(255, 190, 80, 0.18);
+      user-select: none;
       pointer-events: none;
     }
 
@@ -95,6 +112,7 @@
 <body>
   <div class="title">MERRY CHRISTMAS</div>
   <div class="subglow"></div>
+  <div class="signature">To：ShangqingLin</div>
 
   <div class="hint">
     Short click tree: explode → text → tree<br/>
@@ -106,7 +124,7 @@
     Click to enable.
   </div>
 
-  <!-- 可选：你有 mp3 就放同目录 -->
+  <!-- Optional: put christmas.mp3 in the same folder -->
   <audio id="bgm" src="./christmas.mp3" loop preload="auto"></audio>
 
   <script type="importmap">
@@ -130,9 +148,13 @@
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0x020203, 10, 55);
 
-    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 200);
+    const camera = new THREE.PerspectiveCamera(
+      40,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      200
+    );
     camera.position.set(0, 8, 26);
-    camera.lookAt(0, 6, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
@@ -143,15 +165,15 @@
     document.body.appendChild(renderer.domElement);
 
     // -----------------------------
-    // Postprocessing Bloom (金色辉光关键)
+    // Postprocessing Bloom
     // -----------------------------
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.85,   // strength
-      0.65,   // radius
-      0.15    // threshold
+      0.85,  // strength
+      0.65,  // radius
+      0.15   // threshold
     );
     composer.addPass(bloom);
 
@@ -181,7 +203,7 @@
     scene.add(coolPoint);
 
     // -----------------------------
-    // Tree setup
+    // Tree params
     // -----------------------------
     const TREE_HEIGHT = 12;
     const BASE_RADIUS = 5.2;
@@ -190,9 +212,11 @@
     const CUBE_COUNT = 450;
     const TOTAL = SPHERE_COUNT + CUBE_COUNT;
 
+    // Geometries
     const sphereGeo = new THREE.SphereGeometry(0.165, 18, 18);
     const cubeGeo   = new THREE.BoxGeometry(0.265, 0.265, 0.265);
 
+    // Materials (PBR + mild emissive for "golden glow")
     const goldSphereMat = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color("#f7d479"),
       metalness: 1.0,
@@ -227,20 +251,30 @@
       emissiveIntensity: 0.09
     });
 
-    const goldSpheres = new THREE.InstancedMesh(sphereGeo, goldSphereMat, Math.floor(SPHERE_COUNT * 0.65));
-    const redSpheres  = new THREE.InstancedMesh(sphereGeo, redSphereMat,  SPHERE_COUNT - goldSpheres.count);
-    const goldCubes   = new THREE.InstancedMesh(cubeGeo, goldCubeMat, Math.floor(CUBE_COUNT * 0.55));
-    const greenCubes  = new THREE.InstancedMesh(cubeGeo, greenCubeMat, CUBE_COUNT - goldCubes.count);
+    // Instanced meshes grouped by color
+    const goldSpheres = new THREE.InstancedMesh(
+      sphereGeo, goldSphereMat, Math.floor(SPHERE_COUNT * 0.65)
+    );
+    const redSpheres = new THREE.InstancedMesh(
+      sphereGeo, redSphereMat, SPHERE_COUNT - goldSpheres.count
+    );
+    const goldCubes = new THREE.InstancedMesh(
+      cubeGeo, goldCubeMat, Math.floor(CUBE_COUNT * 0.55)
+    );
+    const greenCubes = new THREE.InstancedMesh(
+      cubeGeo, greenCubeMat, CUBE_COUNT - goldCubes.count
+    );
 
     [goldSpheres, redSpheres, goldCubes, greenCubes].forEach(m => {
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     });
 
+    // Root group
     const treeRoot = new THREE.Group();
     scene.add(treeRoot);
     treeRoot.add(goldSpheres, redSpheres, goldCubes, greenCubes);
 
-    // Tree topper (yellow octahedron)
+    // Topper (yellow octahedron)
     const topperGeo = new THREE.OctahedronGeometry(0.48);
     const topperMat = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color("#ffe36a"),
@@ -264,7 +298,7 @@
         text: new Array(count),
         current: new Array(count),
         start: new Array(count),
-        delay: new Float32Array(count) // 错峰关键
+        delay: new Float32Array(count)
       };
     }
 
@@ -297,20 +331,26 @@
       return base * jitter;
     }
 
+    // ✅ Wave-like explode: distance increases slightly with height
     function makeExplodePosition(origin) {
+      const h = THREE.MathUtils.clamp(origin.y / TREE_HEIGHT, 0, 1);
+
       const dir = new THREE.Vector3(
         (Math.random() - 0.5),
-        (Math.random() - 0.15),
+        (Math.random() - 0.18),
         (Math.random() - 0.5)
       ).normalize();
-      const distance = 5.5 + Math.random() * 10.5;
+
+      const distance = 5.0 + h * 6.0 + Math.random() * 4.5;
+
       return origin.clone().add(dir.multiplyScalar(distance));
     }
 
-    // Delay based on height + randomness -> 像视频那种“层级散开/回收”
+    // ✅ Better "choreographed" delay curve
     function computeDelayFromPos(pos) {
       const h = THREE.MathUtils.clamp(pos.y / TREE_HEIGHT, 0, 1);
-      return h * 0.22 + Math.random() * 0.18;
+      const bell = 1 - Math.abs(h - 0.5) * 2; // 0..1..0
+      return (1 - bell) * 0.18 + Math.random() * 0.12;
     }
 
     function initPack(mesh, pack, isCube=false) {
@@ -379,7 +419,6 @@
         }
       }
 
-      // shuffle
       for (let i = points.length - 1; i > 0; i--) {
         const j = (Math.random() * (i + 1)) | 0;
         [points[i], points[j]] = [points[j], points[i]];
@@ -393,7 +432,7 @@
 
         const worldX = nx * 7.4;
         const worldY = 5.2 + (-ny) * 1.25 + (Math.random() - 0.5) * 0.35;
-        const worldZ = (Math.random() - 0.5) * 0.9; // 让字更“立”
+        const worldZ = (Math.random() - 0.5) * 0.9;
 
         return new THREE.Vector3(worldX, worldY, worldZ);
       });
@@ -410,6 +449,7 @@
       }
 
       let cursor = 0;
+
       function assign(meshKey, isCube=false) {
         const pack = targets[meshKey];
         for (let i = 0; i < pack.text.length; i++) {
@@ -469,6 +509,8 @@
       captureStart(targets.redSpheres);
       captureStart(targets.goldCubes);
       captureStart(targets.greenCubes);
+
+      startCameraNudge(shapeState);
     }
 
     function getTargetMatrix(pack, state, i) {
@@ -645,13 +687,9 @@
     }
 
     function tryPlayMusic() {
-      // 只在第一次用户手势后真正“解锁”
       if (!audioArmed) return;
 
-      tryPlayMp3().then(() => {
-        // ok
-      }).catch(() => {
-        // mp3 不存在/被拦截 -> synth
+      tryPlayMp3().catch(() => {
         startSynthBgm();
       });
     }
@@ -663,7 +701,6 @@
       tryPlayMusic();
     }
 
-    // 如果 mp3 资源本身不存在，显示提示（但不打扰）
     if (bgm) {
       bgm.addEventListener("error", () => {
         audioHint.style.display = "block";
@@ -673,6 +710,57 @@
     audioHint.addEventListener("click", () => {
       armAudioOnce();
     });
+
+    // -----------------------------
+    // Cinematic camera nudge
+    // -----------------------------
+    let camAnim = {
+      active: false,
+      t: 0,
+      duration: 0.45,
+      from: new THREE.Vector3(),
+      to: new THREE.Vector3(),
+      fromLook: new THREE.Vector3(),
+      toLook: new THREE.Vector3()
+    };
+
+    const lookTarget = new THREE.Vector3(0, 6, 0);
+
+    function startCameraNudge(state) {
+      camAnim.active = true;
+      camAnim.t = 0;
+
+      camAnim.from.copy(camera.position);
+      camAnim.fromLook.copy(lookTarget);
+
+      if (state === SHAPE.EXPLODE) {
+        camAnim.to.set(0.6, 8.2, 23.8);
+        camAnim.toLook.set(0.2, 6.2, 0);
+      } else if (state === SHAPE.TEXT) {
+        camAnim.to.set(0.0, 7.4, 22.5);
+        camAnim.toLook.set(0.0, 5.6, 0);
+      } else {
+        camAnim.to.set(0, 8, 26);
+        camAnim.toLook.set(0, 6, 0);
+      }
+    }
+
+    function updateCameraAnim(dt) {
+      if (!camAnim.active) return;
+
+      camAnim.t += dt / camAnim.duration;
+      const t = Math.min(1, camAnim.t);
+      const e = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2;
+
+      camera.position.lerpVectors(camAnim.from, camAnim.to, e);
+
+      lookTarget.lerpVectors(camAnim.fromLook, camAnim.toLook, e);
+      camera.lookAt(lookTarget);
+
+      if (t >= 1) camAnim.active = false;
+    }
+
+    camera.lookAt(lookTarget);
 
     // -----------------------------
     // Pointer events
@@ -721,7 +809,6 @@
 
       if (!isDragging && held < LONG_PRESS_MS) {
         if (hitTree(e)) {
-          // 用户第一次有效点击 -> 解锁音频
           armAudioOnce();
 
           if (shapeState === SHAPE.TREE) {
@@ -755,16 +842,19 @@
       // slow rotation
       treeRoot.rotation.y += dt * 0.18;
 
-      // subtle light breathing
+      // light breathing
       warmPoint.intensity = 2.2 + Math.sin(now * 0.0012) * 0.28;
       underGlow.intensity = 0.9 + Math.sin(now * 0.0016 + 1.2) * 0.16;
 
-      // bloom pulse (very slight)
+      // bloom pulse
       bloom.strength = 0.82 + Math.sin(now * 0.0011) * 0.06;
 
-      // topper
+      // topper motion
       topper.position.set(0, TREE_HEIGHT + 0.4, 0);
       topper.rotation.y += dt * 0.65;
+
+      // camera cinematic update
+      updateCameraAnim(dt);
 
       // morph
       if (morph.active) {
@@ -796,8 +886,7 @@
       bloom.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // 如果你希望“打开页面就显示提示可点开音乐”
-    // 但不强制打扰
+    // gentle prompt
     setTimeout(() => {
       if (!audioArmed) audioHint.style.display = "block";
     }, 900);
